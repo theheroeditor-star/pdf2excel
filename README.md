@@ -1,67 +1,129 @@
-# PDF2Excel
+import ConversionForm from '@/components/conversion-form';
 
-PDF2Excel is a focused AI micro-SaaS MVP: upload supplier invoice PDFs, upload the Excel spreadsheet you already maintain, add optional business rules, review the extracted rows, and download the completed workbook.
+export default function HomePage() {
+  return (
+    <main className="min-h-screen bg-[#f7f9ff] text-slate-900">
+      <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
+        <header className="flex items-center justify-between border-b border-slate-200 pb-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-sm font-bold text-white shadow-lg shadow-indigo-200">P2E</div>
+            <div>
+              <div className="text-lg font-bold tracking-tight text-slate-900">PDF2Excel</div>
+              <div className="text-[11px] uppercase tracking-[0.2em] text-slate-500">invoice workflow</div>
+            </div>
+          </div>
 
-## Workflow
+          <div className="hidden items-center gap-3 sm:flex">
+            <a href="#features" className="text-sm font-medium text-slate-600 hover:text-slate-900">Features</a>
+            <a href="#how-it-works" className="text-sm font-medium text-slate-600 hover:text-slate-900">How it works</a>
+            <a href="#pricing" className="text-sm font-medium text-slate-600 hover:text-slate-900">Pricing</a>
+          </div>
+        </header>
 
-1. Upload one or more text-based invoice PDFs.
-2. Optionally upload scanned image files (JPG/PNG) if the PDFs do not contain selectable text.
-3. Upload your existing `.xlsx` or `.xls` spreadsheet.
-4. Add optional rules, such as: `Use the supplier SKU, format dates as YYYY-MM-DD, and leave Job # blank when missing.`
-5. Click **Extract and review**.
-6. Correct any values in the review table, add or delete rows, and export the final spreadsheet.
-7. Click **Download completed Excel**.
+        <section className="grid items-center gap-10 py-16 lg:grid-cols-[1.2fr_0.8fr] lg:py-20">
+          <div>
+            <div className="mb-4 inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">zero manual entry</div>
+            <h1 className="max-w-2xl text-4xl font-black tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">Turn supplier invoices into your spreadsheet in minutes.</h1>
+            <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">Upload your invoice PDFs, match your existing Excel template, and download a clean workbook with the right values already filled in.</p>
 
-The app uses OpenAI on the server to map invoice text to the column headers in your spreadsheet. It does not add authentication, teams, payments, subscriptions, dashboards, a database, or persistent file storage.
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a href="#tool" className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700">Try the tool</a>
+              <a href="#pricing" className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">View pricing</a>
+            </div>
 
-## Set up in VS Code
+            <div className="mt-8 flex flex-wrap gap-5 text-sm text-slate-500">
+              <span>✔ PDF + Excel workflow</span>
+              <span>✔ AI extraction</span>
+              <span>✔ No login required</span>
+            </div>
+          </div>
 
-The project root is the folder that contains `package.json`.
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Example workflow</p>
+              <div className="mt-5 space-y-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-xs font-medium text-slate-500">Supplier invoice</div>
+                  <div className="mt-1 font-semibold text-slate-800">Tru Plumbing Supply</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-xs font-medium text-slate-500">Template</div>
+                  <div className="mt-1 font-semibold text-slate-800">Date • Supplier • SKU • Qty • Total</div>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <div className="text-xs font-medium text-emerald-700">Ready output</div>
+                  <div className="mt-1 font-semibold text-emerald-900">Downloaded workbook</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
-1. Open the project folder in VS Code.
-2. Create a file named `.env.local` beside `package.json`.
-3. Add your new OpenAI key:
+        <section id="features" className="py-8 sm:py-12">
+          <div className="mb-8 text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-700">Features</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">Built for businesses that live in spreadsheets</h2>
+          </div>
 
-   ```env
-   OPENAI_API_KEY=your_new_openai_key_here
-   ```
+          <div className="grid gap-5 md:grid-cols-3">
+            {[
+              { title: 'Invoice capture', text: 'Extract values from supplier PDFs and scanned invoice images.' },
+              { title: 'Template matching', text: 'Map extracted values into the columns you already use in Excel.' },
+              { title: 'Review before export', text: 'Correct any row before downloading the final spreadsheet.' }
+            ].map((feature) => (
+              <div key={feature.title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-lg text-indigo-700">✓</div>
+                <h3 className="text-xl font-semibold text-slate-900">{feature.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{feature.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-   Never commit or share this value. The key must be server-side only.
+        <section id="how-it-works" className="py-12">
+          <div className="mb-8 text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-700">How it works</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">Simple, boring, useful</h2>
+          </div>
 
-4. Open the VS Code terminal and run:
+          <div className="grid gap-5 md:grid-cols-4">
+            {['Upload invoices', 'Add spreadsheet template', 'Review extracted rows', 'Download workbook'].map((step, index) => (
+              <div key={step} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">{index + 1}</div>
+                <p className="text-lg font-semibold text-slate-900">{step}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-   ```powershell
-   npm install
-   npm run dev
-   ```
+        <section id="tool" className="py-12">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8">
+            <div className="mb-5 text-center">
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900">Try the tool</h2>
+            </div>
+            <ConversionForm />
+          </div>
+        </section>
 
-5. Open [http://localhost:3000](http://localhost:3000).
+        <section id="pricing" className="py-14">
+          <div className="mb-8 text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-700">Pricing</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">Keep it simple</h2>
+          </div>
 
-## Production build
-
-```powershell
-npm run build
-npm run start
-```
-
-## Spreadsheet templates
-
-PDF2Excel uses the first worksheet and treats the row with the most populated cells as the header row. Common header examples include:
-
-```text
-Date | Supplier | SKU | Description | Qty | Unit Cost | Total | Job #
-```
-
-The AI returns one row per PDF using those exact headers. The downloaded workbook preserves the uploaded workbook and appends the reviewed rows below the original sheet content.
-
-## OCR support
-
-If a PDF does not contain selectable text, upload a scanned JPG or PNG version in the **Scanned files (optional)** section. The application uses Tesseract OCR to read those images and extract text before mapping the result into the spreadsheet.
-
-## Limitations of this MVP
-
-- Text-based PDFs work best.
-- Scanned/image-only PDFs are supported only when an image version is uploaded alongside the PDF.
-- The application processes up to 20 PDFs per request, with a 10 MB limit per file.
-- The AI call uses `gpt-4o-mini`; usage may incur OpenAI API charges.
-- The current app processes files in memory and does not save job history.
+          <div className="mx-auto max-w-md rounded-3xl border border-indigo-200 bg-indigo-50 p-8 text-center shadow-sm">
+            <div className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-700">Starter</div>
+            <div className="mt-4 text-5xl font-black text-slate-900">$19<span className="text-lg font-medium text-slate-500">/mo</span></div>
+            <p className="mt-3 text-slate-600">For small teams who want to stop retyping supplier invoices.</p>
+            <ul className="mt-6 space-y-3 text-left text-sm text-slate-700">
+              <li>✔ Up to 500 invoice rows/month</li>
+              <li>✔ AI extraction</li>
+              <li>✔ Excel export</li>
+              <li>✔ Basic review workflow</li>
+            </ul>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
