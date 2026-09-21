@@ -1,59 +1,61 @@
 # PDF2Excel
 
-A small Next.js and TypeScript app that turns invoice PDFs into structured Excel spreadsheets using OpenAI-powered extraction and a matching Excel template.
+PDF2Excel is a focused AI micro-SaaS MVP: upload supplier invoice PDFs, upload the Excel spreadsheet you already maintain, review the extracted rows, and download the completed workbook.
 
-## What this version does
+## Workflow
 
-- Upload a text-based invoice PDF.
-- Upload an Excel template with headers like `Invoice Number`, `Customer`, `Invoice Date`, `Due Date`, and `Total`.
-- The PDF content is extracted and normalized.
-- OpenAI reads the PDF text and the template headers, then returns structured invoice data.
-- The app writes those values into the Excel template and downloads the result.
+1. Upload one or more text-based invoice PDFs.
+2. Upload your existing `.xlsx` or `.xls` spreadsheet.
+3. Add optional rules, such as: `Use the supplier SKU, format dates as YYYY-MM-DD, and leave Job # blank when missing.`
+4. Click **Extract and review**.
+5. Correct any cells in the review table.
+6. Click **Download completed Excel**.
 
-This is intentionally simple and does not include authentication, teams, payments, dashboards, or a database.
+The app uses OpenAI on the server to map invoice text to the column headers in your spreadsheet. It does not add authentication, teams, payments, subscriptions, dashboards, a database, or persistent file storage.
 
-## Required environment variable
+## Set up in VS Code
 
-Create a local environment file:
+The project root is the folder that contains `package.json`.
 
-```bash
-cp .env.example .env.local
-```
+1. Open the project folder in VS Code.
+2. Create a file named `.env.local` beside `package.json`.
+3. Add your new OpenAI key:
 
-Then add your OpenAI key:
-
-```env
-OPENAI_API_KEY=your_openai_key_here
-```
-
-## Run locally
-
-1. Install dependencies:
-
-   ```bash
-   npm install
+   ```env
+   OPENAI_API_KEY=your_new_openai_key_here
    ```
 
-2. Start the dev server:
+   Never commit or share this value. The key must be server-side only.
 
-   ```bash
+4. Open the VS Code terminal and run:
+
+   ```powershell
+   npm install
    npm run dev
    ```
 
-3. Visit [http://localhost:3000](http://localhost:3000).
-
-4. Upload the invoice PDF and the Excel template, then click **Convert to Excel**.
+5. Open [http://localhost:3000](http://localhost:3000).
 
 ## Production build
 
-```bash
+```powershell
 npm run build
 npm run start
 ```
 
-## Notes
+## Spreadsheet templates
 
-- Best results come from text-based PDFs.
-- If the PDF is scanned or image-only, OCR would be needed before extraction.
-- The app uses `pdf-parse` for text extraction, then OpenAI to normalize and map the data into the spreadsheet.
-- If OpenAI is unavailable, the app automatically falls back to a regex-based extractor.
+PDF2Excel uses the first worksheet and treats the row with the most populated cells near the top as the header row. Examples of useful headers include:
+
+```text
+Date | Supplier | SKU | Description | Qty | Unit Cost | Total | Job #
+```
+
+The AI returns one row per PDF using those exact headers. The downloaded workbook preserves the uploaded workbook and appends the reviewed rows beneath its existing content.
+
+## Limitations of this MVP
+
+- Text-based PDFs work best. Scanned/image-only PDFs need OCR.
+- The application processes up to 20 PDFs per request, with a 10 MB limit per file.
+- The AI call uses `gpt-4o-mini`; usage may incur OpenAI API charges.
+- The current app processes files in memory and does not save job history. A production SaaS would later need authentication, billing, storage controls, rate limiting, monitoring, and stronger privacy/compliance controls.
