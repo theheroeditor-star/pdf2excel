@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { extractInvoice, populateTemplate } from '@/lib/converter';
+import { extractInvoice, getTemplateHeaders, populateTemplate } from '@/lib/converter';
 
 export const runtime = 'nodejs';
 
@@ -25,7 +25,8 @@ export async function POST(request: Request) {
 
     const pdfBuffer = Buffer.from(await pdfFile.arrayBuffer());
     const templateBuffer = Buffer.from(await templateFile.arrayBuffer());
-    const invoice = await extractInvoice(pdfBuffer);
+    const templateHeaders = getTemplateHeaders(templateBuffer);
+    const invoice = await extractInvoice(pdfBuffer, templateHeaders);
     const output = populateTemplate(templateBuffer, invoice);
 
     return new NextResponse(output, {
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('PDF2Excel conversion failed:', error);
     return NextResponse.json(
-      { message: 'Conversion failed. Use a text-based PDF and a valid Excel workbook.' },
+      { message: 'Conversion failed. Check the PDF contents and ensure the template is a valid Excel workbook.' },
       { status: 500 },
     );
   }

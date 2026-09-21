@@ -1,64 +1,59 @@
 # PDF2Excel
 
-A small Next.js and TypeScript application that extracts common fields from invoice PDFs and writes them into an Excel template.
+A small Next.js and TypeScript app that turns invoice PDFs into structured Excel spreadsheets using OpenAI-powered extraction and a matching Excel template.
 
-## What works
+## What this version does
 
-- Upload one text-based invoice PDF and one `.xlsx` or `.xls` template.
-- The browser sends both files to `POST /api/convert`.
-- The server extracts common fields: invoice number, customer, invoice date, due date, and total.
-- If the template contains matching labels, values are written into the cell immediately to the right of each label.
-- If no labels match, a `PDF2Excel Data` worksheet is added to the workbook.
-- The completed workbook is returned as a download.
+- Upload a text-based invoice PDF.
+- Upload an Excel template with headers like `Invoice Number`, `Customer`, `Invoice Date`, `Due Date`, and `Total`.
+- The PDF content is extracted and normalized.
+- OpenAI reads the PDF text and the template headers, then returns structured invoice data.
+- The app writes those values into the Excel template and downloads the result.
 
-This version does not use authentication, a database, payments, AI APIs, or persistent file storage. Files are processed in memory by the Next.js server and are not saved by this application.
+This is intentionally simple and does not include authentication, teams, payments, dashboards, or a database.
+
+## Required environment variable
+
+Create a local environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+Then add your OpenAI key:
+
+```env
+OPENAI_API_KEY=your_openai_key_here
+```
 
 ## Run locally
 
-You need Node.js 18.17 or newer and npm installed.
-
-1. Clone the repository and open the project directory:
-
-   ```bash
-   git clone https://github.com/theheroeditor-star/pdf2excel.git
-   cd pdf2excel
-   ```
-
-2. Install dependencies:
+1. Install dependencies:
 
    ```bash
    npm install
    ```
 
-3. Start the development server:
+2. Start the dev server:
 
    ```bash
    npm run dev
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000).
+3. Visit [http://localhost:3000](http://localhost:3000).
 
-5. Choose a PDF and Excel template, then click **Convert to Excel**.
+4. Upload the invoice PDF and the Excel template, then click **Convert to Excel**.
 
-## Verify a production build
+## Production build
 
 ```bash
 npm run build
 npm run start
 ```
 
-## Template format
+## Notes
 
-For best results, put labels such as these in one worksheet, with an empty cell immediately to the right:
-
-```text
-Invoice Number | value goes here
-Customer       | value goes here
-Invoice Date   | value goes here
-Due Date       | value goes here
-Total          | value goes here
-```
-
-The parser currently expects text-based PDFs. A scanned/image-only PDF has no selectable text and will need OCR (for example, a future Tesseract or cloud OCR integration) before it can be extracted reliably.
-
-The parser uses simple label matching, so invoice layouts with unusual wording may require adding another regular expression in `lib/converter.ts`.
+- Best results come from text-based PDFs.
+- If the PDF is scanned or image-only, OCR would be needed before extraction.
+- The app uses `pdf-parse` for text extraction, then OpenAI to normalize and map the data into the spreadsheet.
+- If OpenAI is unavailable, the app automatically falls back to a regex-based extractor.
