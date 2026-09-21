@@ -1,8 +1,17 @@
 # PDF2Excel
 
-A small Next.js and TypeScript application for turning invoice PDFs into structured Excel spreadsheets.
+A small Next.js and TypeScript application that extracts common fields from invoice PDFs and writes them into an Excel template.
 
-> **Current behavior:** this first version is a frontend demo. It validates that both files are selected, shows a loading state, and creates a sample downloadable Excel workbook in the browser. It does not yet read PDF contents or modify the uploaded template.
+## What works
+
+- Upload one text-based invoice PDF and one `.xlsx` or `.xls` template.
+- The browser sends both files to `POST /api/convert`.
+- The server extracts common fields: invoice number, customer, invoice date, due date, and total.
+- If the template contains matching labels, values are written into the cell immediately to the right of each label.
+- If no labels match, a `PDF2Excel Data` worksheet is added to the workbook.
+- The completed workbook is returned as a download.
+
+This version does not use authentication, a database, payments, AI APIs, or persistent file storage. Files are processed in memory by the Next.js server and are not saved by this application.
 
 ## Run locally
 
@@ -27,17 +36,29 @@ You need Node.js 18.17 or newer and npm installed.
    npm run dev
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser.
+4. Open [http://localhost:3000](http://localhost:3000).
 
-5. Select one PDF and one `.xlsx` or `.xls` template, then click **Convert to Excel**. After the simulated processing state finishes, click **Download Excel file**.
+5. Choose a PDF and Excel template, then click **Convert to Excel**.
 
-## Production build
-
-To verify the production build locally:
+## Verify a production build
 
 ```bash
 npm run build
 npm run start
 ```
 
-The app uses Tailwind CSS for styling and the `xlsx` package to generate the sample workbook in the browser. No authentication, database, payment, AI, or external service is required.
+## Template format
+
+For best results, put labels such as these in one worksheet, with an empty cell immediately to the right:
+
+```text
+Invoice Number | value goes here
+Customer       | value goes here
+Invoice Date   | value goes here
+Due Date       | value goes here
+Total          | value goes here
+```
+
+The parser currently expects text-based PDFs. A scanned/image-only PDF has no selectable text and will need OCR (for example, a future Tesseract or cloud OCR integration) before it can be extracted reliably.
+
+The parser uses simple label matching, so invoice layouts with unusual wording may require adding another regular expression in `lib/converter.ts`.
