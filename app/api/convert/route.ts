@@ -11,7 +11,9 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const template = formData.get('template');
     const pdfEntries = formData.getAll('pdfs');
+    const scanEntries = formData.getAll('scans');
     const pdfs = pdfEntries.filter((entry): entry is File => entry instanceof File);
+    const scans = scanEntries.filter((entry): entry is File => entry instanceof File);
     const rules = String(formData.get('rules') ?? '').slice(0, 4000);
 
     if (!(template instanceof File) || pdfs.length === 0) {
@@ -22,21 +24,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: `Upload up to ${MAX_PDFS} PDFs at a time.` }, { status: 400 });
     }
 
-    const files = [...pdfs, template];
-    if (files.some((file) => file.size === 0)) {
+    const allFiles = [...pdfs, ...scans, template];
+    if (allFiles.some((file) => file.size === 0)) {
       return NextResponse.json({ message: 'Uploaded files cannot be empty.' }, { status: 400 });
     }
-    if (files.some((file) => file.size > MAX_FILE_SIZE)) {
+    if (allFiles.some((file) => file.size > MAX_FILE_SIZE)) {
       return NextResponse.json({ message: 'Each file must be smaller than 10 MB.' }, { status: 413 });
     }
 
     const templateBuffer = Buffer.from(await template.arrayBuffer());
     const pdfBuffers = await Promise.all(pdfs.map(async (file) => Buffer.from(await file.arrayBuffer())));
-    const result = await convertPdfFiles(pdfBuffers, templateBuffer, rules);
+    const scanBuffers = await Promise.all(scans.map(async (file) => Buffer.from(await file.arrayBuffer())));
+    const result = await convertPdfFiles(pdfBuffers, scanBuffers, templateBuffer, rules);
 
-    return NextResponse.json({ ...result, templateHeaders: getTemplateHeaders(templateBuffer) });
+    return NextResponse.json({
+      ...result,
+      templateHeaders: getTemplateHeaders(templateBuffer),
+    });
   } catch (error) {
     console.error('PDF2Excel conversion failed:', error);
-    return NextResponse.json({ message: 'Conversion failed. Check that the PDFs contain text and the template is a valid Excel workbook.' }, { status: 500 });
+    return NextResponse.json({ message: 'Conversion failed. Check the PDFs and template and try again.' }, { status: 500 });
   }
 }

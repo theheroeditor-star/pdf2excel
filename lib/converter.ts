@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import OpenAI from 'openai';
 import pdfParse from 'pdf-parse';
+import Tesseract from 'tesseract.js';
 
 export type InvoiceRow = Record<string, string>;
 
@@ -24,20 +25,23 @@ function normalizeKey(value: string) {
 function normalizeDate(value: string) {
   const trimmed = clean(value);
   if (!trimmed) return '';
+
   const match = trimmed.match(/(\d{1,4})[./-](\d{1,2})[./-](\d{1,4})/);
   if (!match) return trimmed;
 
   const [, first, second, third] = match;
   const year = third.length === 2 ? `20${third}` : third;
-  const dayFirst = Number(first) > 12;
-  const day = dayFirst ? first : third.length === 4 ? second : first;
-  const month = dayFirst ? second : third.length === 4 ? first : second;
-  return `${year.length === 4 ? year : third}-${String(Number(month)).padStart(2, '0')}-${String(Number(day)).padStart(2, '0')}`;
+  const month = String(Number(second)).padStart(2, '0');
+  const day = String(Number(first)).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 }
 
 function normalizeMoney(value: string) {
-  const match = value.replace(/,/g, '').match(/-?\d+(?:\.\d{1,2})?/);
-  return match ? Number(match[0]).toFixed(2) : clean(value);
+  const cleaned = value.replace(/,/g, '').replace(/[^0-9.\-]/g, '');
+  if (!cleaned) return clean(value);
+  const numeric = Number(cleaned);
+  return Number.isFinite(numeric) ? numeric.toFixed(2) : clean(value);
 }
 
 function findValue(text: string, patterns: RegExp[]) {
@@ -49,18 +53,22 @@ function findValue(text: string, patterns: RegExp[]) {
 }
 
 function fallbackRow(text: string, headers: string[]): InvoiceRow {
-  const values: Record<string, string> = {
+  const extracted: Record<string, string> = {
     invoicenumber: findValue(text, [/invoice\s*(?:number|no\.?|#)?\s*[:#-]\s*([A-Z0-9][A-Z0-9-]*)/i, /invoice\s+([A-Z0-9][A-Z0-9-]*)/i]),
     supplier: findValue(text, [/(?:supplier|vendor|from)\s*[:#-]\s*([^|;]+)/i]),
     customer: findValue(text, [/(?:customer|client|bill\s*to)\s*[:#-]\s*([^|;]+)/i]),
     invoicedate: normalizeDate(findValue(text, [/(?:invoice\s*)?date\s*[:#-]\s*([0-9]{1,4}[./-][0-9]{1,2}[./-][0-9]{1,4})/i])),
     duedate: normalizeDate(findValue(text, [/due\s*date\s*[:#-]\s*([0-9]{1,4}[./-][0-9]{1,2}[./-][0-9]{1,4})/i])),
     total: normalizeMoney(findValue(text, [/(?:total|amount\s*due|balance\s*due)\s*[:#-]?\s*([$€£]?\s*[0-9,]+(?:\.\d{1,2})?)/i])),
+    description: findValue(text, [/description\s*[:#-]\s*([^\n]+)/i]),
+    quantity: findValue(text, [/qty\s*[:#-]\s*([0-9]+(?:\.[0-9]+)?)/i, /quantity\s*[:#-]\s*([0-9]+(?:\.[0-9]+)?)/i]),
+    unitcost: normalizeMoney(findValue(text, [/unit\s*cost\s*[:#-]\s*([$€£]?\s*[0-9,]+(?:\.\d{1,2})?)/i, /rate\s*[:#-]\s*([$€£]?\s*[0-9,]+(?:\.\d{1,2})?)/i])),
+    jobnumber: findValue(text, [/job\s*#?\s*[:#-]\s*([A-Z0-9-]+)/i, /job\s*number\s*[:#-]\s*([A-Z0-9-]+)/i])
   };
 
   return Object.fromEntries(headers.map((header) => {
     const key = normalizeKey(header);
-    return [header, values[key] ?? ''];
+    return [header, extracted[key] ?? ''];
   }));
 }
 
@@ -68,24 +76,27 @@ function parseTemplate(templateBuffer: Buffer) {
   const workbook = XLSX.read(templateBuffer, { type: 'buffer' });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
-  if (!sheet) throw new Error('The Excel template does not contain a worksheet.');
+
+  if (!sheet) {
+    throw new Error('The Excel template does not contain a worksheet.');
+  }
 
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false }) as unknown[][];
-  let headerRowIndex = 0;
-  let bestHeaderCount = 0;
+  let bestHeaderIndex = 0;
+  let bestCount = 0;
 
-  rows.slice(0, 40).forEach((row, index) => {
+  rows.forEach((row, index) => {
     const count = row.filter((cell) => String(cell ?? '').trim()).length;
-    if (count > bestHeaderCount) {
-      bestHeaderCount = count;
-      headerRowIndex = index;
+    if (count > bestCount) {
+      bestCount = count;
+      bestHeaderIndex = index;
     }
   });
 
-  const candidateHeaders = (rows[headerRowIndex] ?? []).map((cell) => String(cell ?? '').trim());
-  const headers = candidateHeaders.filter(Boolean).length >= 2 ? candidateHeaders.filter(Boolean) : DEFAULT_HEADERS;
+  const candidateHeaders = (rows[bestHeaderIndex] ?? []).map((cell) => String(cell ?? '').trim()).filter(Boolean);
+  const headers = candidateHeaders.length >= 2 ? candidateHeaders : DEFAULT_HEADERS;
 
-  return { workbook, sheet, sheetName, rows, headerRowIndex, headers };
+  return { workbook, sheet, sheetName, headers };
 }
 
 export function getTemplateHeaders(templateBuffer: Buffer) {
@@ -93,9 +104,11 @@ export function getTemplateHeaders(templateBuffer: Buffer) {
 }
 
 async function extractWithOpenAI(pdfText: string, headers: string[], rules: string): Promise<InvoiceRow> {
-  if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not configured.');
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not configured.');
+  }
 
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await client.chat.completions.create({
     model: 'gpt-4o-mini',
     temperature: 0,
@@ -103,42 +116,59 @@ async function extractWithOpenAI(pdfText: string, headers: string[], rules: stri
     messages: [
       {
         role: 'system',
-        content: 'You extract invoice data for a spreadsheet. Return one JSON object whose keys exactly match the provided spreadsheet headers. Use strings for values, empty strings for missing values, and never invent data. Normalize dates to YYYY-MM-DD and money to decimal numbers without currency symbols.',
+        content: 'You are extracting invoice data into a spreadsheet. Return valid JSON only. Keys must match the exact spreadsheet headers. Use empty strings for missing values. Normalize dates to YYYY-MM-DD and money to numeric strings with 2 decimal places.'
       },
       {
         role: 'user',
-        content: `Spreadsheet headers:\n${headers.map((header) => `- ${header}`).join('\n')}\n\nCustomer rules:\n${rules || 'No extra rules.'}\n\nInvoice text:\n${pdfText.slice(0, 24000)}`,
-      },
-    ],
+        content: `Spreadsheet headers:\n${headers.map((header) => `- ${header}`).join('\n')}\n\nBusiness rules:\n${rules || 'No extra rules.'}\n\nInvoice text:\n${pdfText.slice(0, 24000)}`
+      }
+    ]
   });
 
-  const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}') as Record<string, unknown>;
+  const content = response.choices[0]?.message?.content ?? '{}';
+  const parsed = JSON.parse(content) as Record<string, unknown>;
   return Object.fromEntries(headers.map((header) => [header, String(parsed[header] ?? '').trim()]));
 }
 
-export async function convertPdfFiles(pdfBuffers: Buffer[], templateBuffer: Buffer, rules: string): Promise<ConversionResult> {
+async function ocrImage(buffer: Buffer) {
+  const result = await Tesseract.recognize(buffer, 'eng');
+  return clean(result.data.text || '');
+}
+
+export async function convertPdfFiles(pdfBuffers: Buffer[], scanBuffers: Buffer[], templateBuffer: Buffer, rules: string): Promise<ConversionResult> {
   const headers = getTemplateHeaders(templateBuffer);
   const rows: InvoiceRow[] = [];
   const warnings: string[] = [];
   let usedAi = Boolean(process.env.OPENAI_API_KEY);
 
   for (let index = 0; index < pdfBuffers.length; index += 1) {
-    const parsed = await pdfParse(pdfBuffers[index]);
-    const text = clean(parsed.text || '');
+    const pdfBuffer = pdfBuffers[index];
+    const scanBuffer = scanBuffers[index];
+    const parsedPdf = await pdfParse(pdfBuffer);
+    let extractedText = clean(parsedPdf.text || '');
 
-    if (!text) {
-      warnings.push(`Invoice ${index + 1} has no selectable text. OCR is needed for scanned PDFs.`);
+    if (!extractedText && scanBuffer) {
+      try {
+        extractedText = await ocrImage(scanBuffer);
+        warnings.push(`Invoice ${index + 1} was read with OCR because the PDF did not include selectable text.`);
+      } catch (ocrError) {
+        console.warn('OCR failed:', ocrError);
+      }
+    }
+
+    if (!extractedText) {
+      warnings.push(`Invoice ${index + 1} has no readable text. Try uploading a scanned JPG/PNG version.`);
       rows.push(fallbackRow('', headers));
       usedAi = false;
       continue;
     }
 
     try {
-      rows.push(await extractWithOpenAI(text, headers, rules));
+      rows.push(await extractWithOpenAI(extractedText, headers, rules));
     } catch (error) {
-      console.warn('OpenAI extraction failed; using fallback parser.', error);
-      warnings.push(`Invoice ${index + 1} used the basic fallback parser.`);
-      rows.push(fallbackRow(text, headers));
+      console.warn('AI extraction failed, using fallback parser.', error);
+      warnings.push(`Invoice ${index + 1} used the fallback parser.`);
+      rows.push(fallbackRow(extractedText, headers));
       usedAi = false;
     }
   }
@@ -147,11 +177,9 @@ export async function convertPdfFiles(pdfBuffers: Buffer[], templateBuffer: Buff
 }
 
 export function populateTemplate(templateBuffer: Buffer, headers: string[], rows: InvoiceRow[]) {
-  const parsed = parseTemplate(templateBuffer);
-  const { workbook, sheet, headerRowIndex } = parsed;
+  const { workbook, sheet } = parseTemplate(templateBuffer);
   const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
-  const headerColumns = headers.map((header) => normalizeKey(header));
-  const startRow = Math.max(range.e.r + 1, headerRowIndex + 1);
+  const startRow = range.e.r + 1;
 
   rows.forEach((row, rowIndex) => {
     headers.forEach((header, columnIndex) => {
@@ -161,11 +189,12 @@ export function populateTemplate(templateBuffer: Buffer, headers: string[], rows
     });
   });
 
-  if (!sheet['!ref']) {
-    sheet['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: startRow + rows.length, c: headerColumns.length - 1 } });
-  } else {
-    sheet['!ref'] = XLSX.utils.encode_range({ s: range.s, e: { r: Math.max(range.e.r, startRow + rows.length - 1), c: Math.max(range.e.c, headerColumns.length - 1) } });
-  }
+  const endRow = startRow + rows.length;
+  const endColumn = Math.max(headers.length - 1, range.e.c);
+  sheet['!ref'] = XLSX.utils.encode_range({
+    s: { r: range.s.r, c: range.s.c },
+    e: { r: endRow, c: endColumn }
+  });
 
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
 }
