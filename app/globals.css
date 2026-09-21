@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  background: #f6f8fc;
+  color: #172033;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(93, 116, 232, 0.12), transparent 32rem),
+    #f6f8fc;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+input[type='file']::file-selector-button {
+  margin-right: 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: #e9edff;
+  padding: 0.5rem 0.75rem;
+  color: #3659e3;
+  font-weight: 600;
+  cursor: pointer;
+}
